@@ -1,0 +1,17 @@
+// название, цена, адрес, метро, есть ли возможность взять в ипотеку, общая площадь, жилая площадь, площадь кухни, этаж, год сдачи, отделка, тип жилья
+
+// Разбить местоположение на адрес + метро DONE
+// Проверить выгрузку названия объявления DONE
+// Разбить инфо о квартире по отдельным пунктам DONE
+// Проверить новый селектор для блока О доме SKIP
+// Добавить в столбец Фотки инфу о кол-ве фоток в объявлении DONE
+
+{
+  "Название объявления": "itemprop=name data-marker=item-view/title-info",
+  "О квартире": "id=bx_item-params data-marker=item-view/item-params",
+  "Местоположение": "itemprop=address itemtype=http://schema.org/PostalAddress",
+  "О доме": "class=HRzg1",
+  "Описание": "id=bx_item-description class=ObmG7",
+  "Цена": "itemprop=price class=hQ3Iv data-marker=item-view/item-price",
+  "Фотки": "id=bx_item-gallery class=Dc5af data-marker=item-view/gallery"
+}
