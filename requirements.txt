@@ -1,8 +1,4 @@
-requests
-beautifulsoup4
-lxml
 selenium
-webdriver-manager
 undetected-chromedriver
-openpyxl
-pandas 
+gspread
+google-auth 

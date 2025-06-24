@@ -80,43 +80,44 @@ def count_photos(driver):
         print(f'Не удалось посчитать фото: {e}')
         return 0
 
-def extract_apartment_params(driver, block_selector):
+def find_block_by_title(driver, title_text):
+    blocks = driver.find_elements(By.CSS_SELECTOR, 'div.cK39j')
+    for block in blocks:
+        try:
+            h2 = block.find_element(By.TAG_NAME, 'h2')
+            if h2.text.strip() == title_text:
+                return block
+        except Exception:
+            continue
+    return None
+
+def extract_block_params_from_block(block):
     params = {}
     try:
-        print(f'[extract_apartment_params] URL: {driver.current_url}')
-        print(f'[extract_apartment_params] Title: {driver.title}')
-        block = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, block_selector))
-        )
-        print('[extract_apartment_params] Найден блок')
-        ul = WebDriverWait(block, 10).until(
-            lambda el: el.find_element(By.TAG_NAME, 'ul')
-        )
-        print('[extract_apartment_params] Найден ul:', ul.get_attribute('outerHTML')[:500])
-        li_elements = WebDriverWait(ul, 10).until(
-            lambda el: len(el.find_elements(By.TAG_NAME, 'li')) > 0
-        )
+        ul = block.find_element(By.TAG_NAME, 'ul')
         li_elements = ul.find_elements(By.TAG_NAME, 'li')
-        print(f'[extract_apartment_params] Найдено li: {len(li_elements)}')
-        for idx, li in enumerate(li_elements):
-            li_html = li.get_attribute('innerHTML')
-            print(f'[extract_apartment_params] li[{idx}]:', li.get_attribute('outerHTML')[:300])
+        for li in li_elements:
             spans = li.find_elements(By.TAG_NAME, 'span')
             if spans:
-                key = spans[0].text.replace(':', '').strip()
+                inner_text = spans[0].get_attribute('innerText')
+                key = inner_text.split(':')[0].strip() if inner_text else ''
+                if not key:
+                    key_html = spans[0].get_attribute('innerHTML')
+                    if key_html:
+                        key_html = key_html.split('<span')[0].strip()
+                        key = re.sub(r'<.*?>', '', key_html).replace(':', '').strip()
                 last_span = spans[-1]
                 last_span_html = last_span.get_attribute('outerHTML')
-                after_span = li_html.split(last_span_html)[-1]
+                li_html = li.get_attribute('innerHTML')
+                after_span = li_html.split(last_span_html)[-1] if last_span_html and li_html else ''
                 value = re.sub(r'<.*?>', '', after_span)
                 value = value.replace('\xa0', ' ').replace('&nbsp;', ' ').strip()
             else:
                 key = li.text.strip()
                 value = li.text.strip()
-            print(f'[extract_apartment_params] {key} = {value}')
             params[key] = value
     except Exception as e:
-        print(f'[extract_apartment_params] Ошибка: {e}')
-    print('[extract_apartment_params] Итоговый словарь:', params)
+        print(f'[extract_block_params_from_block] Ошибка: {e}')
     return params
 
 def parse_avito():
@@ -130,6 +131,8 @@ def parse_avito():
     # Чтение полей и селекторов
     fields_map = get_fields()
     fields = list(fields_map.keys())
+    # Убираем столбец 'О квартире' из выгрузки
+    fields = [f for f in fields if f != 'О квартире']
     # Проверяем, есть ли заголовки (первые N столбцов совпадают с fields)
     existing = worksheet.get_all_values()
     if not existing or existing[0][:len(fields)] != fields:
@@ -221,29 +224,38 @@ def parse_avito():
                 row[field] = link
             elif field == 'Фотки':
                 row[field] = count_photos(driver)
+            elif field in ['О квартире', 'О доме', 'Местоположение']:
+                continue  # Эти блоки не выгружаем напрямую
             else:
                 row[field] = get_value_by_field(driver, selector)
 
-        # Сбор параметров из блока О квартире
-        apt_params = extract_apartment_params(driver, fields_map['О квартире'])
+        # Сбор параметров из блоков по заголовку
+        apt_block = find_block_by_title(driver, 'О квартире')
+        dom_block = find_block_by_title(driver, 'О доме')
+        loc_block = find_block_by_title(driver, 'Расположение')
+        apt_params = extract_block_params_from_block(apt_block) if apt_block else {}
+        dom_params = extract_block_params_from_block(dom_block) if dom_block else {}
+        loc_params = extract_block_params_from_block(loc_block) if loc_block else {}
 
         # Автоматическая подстройка структуры таблицы
         current_headers = worksheet.row_values(1)
         new_columns = []
-
-        for col in apt_params.keys():
-            if col not in current_headers:
+        for col in list(apt_params.keys()) + list(dom_params.keys()) + list(loc_params.keys()):
+            if col and col not in current_headers:
                 new_columns.append(col)
         if new_columns:
-            # Добавляем новые столбцы в заголовок
             worksheet.add_cols(len(new_columns))
             updated_headers = current_headers + new_columns
             worksheet.delete_rows(1)
             worksheet.insert_row(updated_headers, 1)
             current_headers = updated_headers
 
-        # Объединяем row с apt_params
+        # Объединяем row с параметрами из всех блоков
         for k, v in apt_params.items():
+            row[k] = v
+        for k, v in dom_params.items():
+            row[k] = v
+        for k, v in loc_params.items():
             row[k] = v
 
         # Формируем values по актуальным заголовкам
