@@ -11,15 +11,15 @@ import json
 
 # === Настройки ===
 AVITO_SEARCH_URL = 'https://www.avito.ru/sankt-peterburg/kvartiry/prodam-ASgBAgICAUSSA8YQ'
-COOKIES_FILE = 'cookies.json'
-GOOGLE_CREDENTIALS_FILE = 'google-credentials.json'
+COOKIES_JSON = ""
+GOOGLE_CREDENTIALS_JSON = ""
 GOOGLE_SHEET_NAME = 'Авито'
 PROXY_LIST_URL = 'https://www.proxy-list.download/api/v1/get?type=https'
 USE_PROXY = False  # Можно отключить, если не нужны прокси
 REQUEST_DELAY = (2, 5)  # Задержка между запросами (секунды)
 MAX_LISTINGS = 10  # Ограничение на количество объявлений
 SHEET_ID = '1-MgalKBBe1FqtLr3caL1h_CJjRfwc8GS51VAIsPgfNg'
-MAX_PAGES_LIMIT = 5  # <-- ваш ID
+MAX_PAGES_LIMIT = 5 
 
 # Настройка логирования ошибок
 logging.basicConfig(
@@ -35,12 +35,9 @@ def log_error(msg: str):
     logging.error(msg)
 
 # === Чтение cookies ===
-def load_cookies_from_json(session: requests.Session, filename: str):
-    """Загружает cookies из JSON-файла (массив объектов) и добавляет их в сессию requests"""
-    if not os.path.exists(filename):
-        raise FileNotFoundError(f"Файл cookies не найден: {filename}")
-    with open(filename, 'r', encoding='utf-8') as f:
-        cookies = json.load(f)
+def load_cookies_from_json(session: requests.Session, cookies_json: str):
+    """Загружает cookies из JSON-строки (массив объектов) и добавляет их в сессию requests"""
+    cookies = json.loads(cookies_json)
     for cookie in cookies:
         # Только name, value, domain, path обязательны
         session.cookies.set(
@@ -71,7 +68,7 @@ def get_random_proxy(proxy_list: List[str]) -> Optional[dict]:
 
 # === Google Sheets ===
 def get_gspread_client():
-    creds = Credentials.from_service_account_file(GOOGLE_CREDENTIALS_FILE, scopes=[
+    creds = Credentials.from_service_account_info(json.loads(GOOGLE_CREDENTIALS_JSON), scopes=[
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ])
@@ -206,7 +203,7 @@ def main():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept-Language': 'ru-RU,ru;q=0.9',
     })
-    load_cookies_from_json(session, COOKIES_FILE)
+    load_cookies_from_json(session, COOKIES_JSON)
 
     client = get_gspread_client()
     sheet = get_or_create_worksheet(client)
